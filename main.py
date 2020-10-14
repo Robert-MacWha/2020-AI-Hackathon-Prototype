@@ -91,3 +91,17 @@ model = Model([i1, i2], x)
 # print(model.summary())
 
 print(f"Created model in {time() - start_time}s")
+
+"""  Training process """
+# xs and ys are passed from the front end
+EPOCHS = 10
+BATCH_SIZE = 32
+
+Xs = []
+ys = []
+
+new_xs = []
+new_ys = []
+
+for e in range(EPOCHS):
+   
