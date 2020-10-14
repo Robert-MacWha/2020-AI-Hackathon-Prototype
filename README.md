@@ -1,1 +1,2 @@
-# 2020-AI-Hackathon-Prototype
+# 2020 AI Hackathon Prototype
+Backend python script and tokenizer database
