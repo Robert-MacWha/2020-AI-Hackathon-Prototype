@@ -15,6 +15,8 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 from time import time
 start_time = 0
 
+from tqdm import tqdm
+
 import sys, json
 
 import tensorflow as tf
@@ -29,7 +31,35 @@ from tensorflow.keras.layers import Input, Dense, Flatten, Embedding, Concatenat
 
 import numpy as np
 
-print("aaa \xe2\x80\x93 aaa \n aaa")
+""" Functions --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"""
+
+def buildEncoder():
+   i = Input(shape=(input_shape))
+
+   x = Embedding(vocab_size, embeding_dim)(i)
+
+   x = Flatten()(x) # embeding_dim * input_shape
+   
+   x = Dense(2048, activation="relu")(x)
+   x = Dense(1024, activation="relu")(x)
+
+   return i, x
+
+def train():
+   current_loss = LOSS_GOAL * 10 # has to be larger than the loss goal by default
+
+   # train the model until we're happy with the results
+   while current_loss > LOSS_GOAL:
+      # train the model if there are enough data points
+      if len(Xs) > BATCH_SIZE:
+         history = model.fit(Xs, ys, epochs=1, batch_size=BATCH_SIZE) 
+         current_loss = history[0]
+
+      # append any new data points to the training data
+      if len(new_Xs) != 0:
+         Xs.append(new_Xs)
+         ys.append(new_ys)
+
 
 """ Create input preprocessor (resume text) -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- """
 start_time = time()
@@ -63,18 +93,6 @@ input_shape = padded_sequences.shape[1]
 vocab_size = 1000
 embeding_dim = 32
 
-def buildEncoder():
-   i = Input(shape=(input_shape))
-
-   x = Embedding(vocab_size, embeding_dim)(i)
-
-   x = Flatten()(x) # embeding_dim * input_shape
-   
-   x = Dense(2048, activation="relu")(x)
-   x = Dense(1024, activation="relu")(x)
-
-   return i, x
-
 # build the two encoding portions of the model
 i1, x1 = buildEncoder()
 i2, x2 = buildEncoder()
@@ -88,20 +106,21 @@ x = Dense(64,   activation="relu")(x)
 x = Dense(2,    activation="sigmoid")(x)
 
 model = Model([i1, i2], x)
+model.compile(
+   loss="categorical_crossentropy",
+   optimizer="adam"
+)
 # print(model.summary())
 
 print(f"Created model in {time() - start_time}s")
 
-"""  Training process """
+""" Training process -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- """
 # xs and ys are passed from the front end
-EPOCHS = 10
+LOSS_GOAL = 0.01
 BATCH_SIZE = 32
 
 Xs = []
 ys = []
 
-new_xs = []
+new_Xs = []
 new_ys = []
-
-for e in range(EPOCHS):
-   
