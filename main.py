@@ -9,15 +9,12 @@
 
 # disable tensorflow logging
 import os
-from os import truncate
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 from time import time
 start_time = 0
 
-from tqdm import tqdm
-
-import sys, json
+import sys, requests, random, math
 
 import tensorflow as tf
 
@@ -31,8 +28,36 @@ from tensorflow.keras.layers import Input, Dense, Flatten, Embedding, Concatenat
 
 import numpy as np
 
-""" Functions --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"""
+""" Server Initialization """
+dataset_url       = "https://reqres.in/api/userz?delay=3"
+new_data_url      = "https://reqres.in/api/userz?delay=3"
+return_sorted_url = "https://reqres.in/api/userz?delay=3"
 
+# get the dataset from the website
+dataset = None
+i = 0
+max_attempts = 10
+
+# try [max_attempts] times
+while dataset == None:
+   try:
+      # make a request, if it is valid set the dataset var to the given dataset
+      r = requests.get(dataset_url, timeout=10)
+      dataset = r.json()
+   except:
+      # increment the counter and print an warning message
+      i += 1
+      print(f"Request {i}/{max_attempts} failed, no responce / invalid responce")
+
+   # if the server has not responded for [max_attempts] tries, just quit the program
+   if i >= max_attempts:
+      print("Failed to connect to server, load dataset onto website before running this script")
+      sys.exit()
+
+# convert the dataset into a list of resumes
+resumes_dataset = []
+
+""" Functions --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------"""
 def buildEncoder():
    i = Input(shape=(input_shape))
 
@@ -45,41 +70,20 @@ def buildEncoder():
 
    return i, x
 
-def train():
-   current_loss = LOSS_GOAL * 10 # has to be larger than the loss goal by default
-
-   # train the model until we're happy with the results
-   while current_loss > LOSS_GOAL:
-      # train the model if there are enough data points
-      if len(Xs) > BATCH_SIZE:
-         history = model.fit(Xs, ys, epochs=1, batch_size=BATCH_SIZE) 
-         current_loss = history[0]
-
-      # append any new data points to the training data
-      if len(new_Xs) != 0:
-         Xs.append(new_Xs)
-         ys.append(new_ys)
-
-
 """ Create input preprocessor (resume text) -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- """
 start_time = time()
 
 # words that will be considered in preprocessing.  Any words not included will be replaced with the oov_token (currently <OOV>)
-sample_text = [
-   "The stranger, who the reader soon learns is Victor Frankenstein, begins his narration. He starts with his family background, birth, and early childhood, telling Walton about his father, Alphonse, and his mother, Caroline. Alphonse became Caroline’s protector when her father, Alphonse’s longtime friend Beaufort, died in poverty. They married two years later, and Victor was born soon after.",
-
-   "Frankenstein then describes how his childhood companion, Elizabeth Lavenza, entered his family. At this point in the narrative, the original (1818) and revised (1831) versions of Frankenstein diverge. In the original version, Elizabeth is Victor’s cousin, the daughter of Alphonse’s sister; when Victor is four years old, Elizabeth’s mother dies and Elizabeth is adopted into the Frankenstein family. In the revised version, Elizabeth is discovered by Caroline, on a trip to Italy, when Victor is about five years old. While visiting a poor Italian family,",
-
-   "Caroline notices a beautiful blonde girl among the dark-haired Italian children; upon discovering that Elizabeth is the orphaned daughter of a Milanese nobleman and a German woman and that the Italian family can barely afford to feed her, Caroline adopts Elizabeth and brings her back to Geneva. Victor’s mother decides at the moment of the adoption that Elizabeth and Victor should someday marry."
-]
+tokenizer_text = random.choice(resumes_dataset, math.floor(len(resumes_dataset) / 10))
 
 # num_words is the max amount of encoded words, oov_token is the character used if the tokenizer is looking for a previously unseen word
 tokenizer = Tokenizer(num_words = 1000, oov_token="<OOV>")
-tokenizer.fit_on_texts(sample_text)
+tokenizer.fit_on_texts(tokenizer_text)
 
-sequences = tokenizer.texts_to_sequences(sample_text)                                   # converts the text inputs into lists of ints
-padded_sequences = pad_sequences(sequences, padding="post", truncating="post")            # normalizes the lengths of the int lists
-padded_sequences = np.asarray(padded_sequences)                                         # convert the list into a np array (easier to work with)
+sequences       = tokenizer.texts_to_sequences(tokenizer_text)                             # converts the text inputs into lists of ints
+resumes_dataset = pad_sequences(sequences, padding="post", truncating="post")              # normalizes the lengths of the int lists
+resumes_dataset = np.asarray(resumes_dataset)                                              # convert the list into a np array (easier to work with)
+
 
 print(f"Processed Tokenizer in {time() - start_time}s")
 
@@ -119,8 +123,58 @@ print(f"Created model in {time() - start_time}s")
 LOSS_GOAL = 0.01
 BATCH_SIZE = 32
 
-Xs = []
+model_loss = LOSS_GOAL + 1 # starts of higher than the goal
+
+Xs_r0 = []
+Xs_r1 = []
 ys = []
 
-new_Xs = []
-new_ys = []
+while model_loss > LOSS_GOAL and not len(Xs_r0) < BATCH_SIZE * 2:
+   # try to train the model
+   if len(Xs_r0) > BATCH_SIZE:
+      history = model.fit([Xs_r0, Xs_r1], ys, epochs = 1, batch_size = BATCH_SIZE)
+      model_loss = history.history["loss"]
+
+   # see if the website has any new data for me
+   try:
+      # create the post info
+      resumes = random.sample(range(len(Xs)), 2)
+      payload = {"0": resumes[0], "1": resumes[1]}
+
+      # call the post
+      r = requests.post(new_data_url, json=payload)
+
+      # get the result and parse the info
+      result = r.json()
+      r0 = result["0"]
+      r1 = result["1"]
+      preferred_resume = result["preferred"]
+
+      # append the new inputs to the training data
+      Xs_r0.append(resumes_dataset[r0])
+      Xs_r1.append(resumes_dataset[r1])
+
+      ys.append([1 - preferred_resume, preferred_resume])
+
+   except:
+      print("Failed to connect to website, unable to get new training data")
+      sys.exit()
+
+# training is done, make a final post to the website with the ordered list of the resumes
+def compareResumes(r1, r2):
+   model_prediction = model.predict([r1, r2])
+
+   if model_prediction[0] > model_prediction[1]:
+      return -1
+
+   return 1
+
+# sort the list
+sorted_resumes = resumes_dataset
+sorted_resumes.sort(key=compareResumes)
+
+# post to the website
+try:
+   r = requests.post(return_sorted_url, json=sorted_resumes)
+except:
+   print("Unable to post sorted list to website")
