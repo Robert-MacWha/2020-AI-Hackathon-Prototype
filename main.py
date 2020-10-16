@@ -61,7 +61,7 @@ resumes_dataset = []
 def buildEncoder():
    i = Input(shape=(input_shape))
 
-   x = Embedding(vocab_size, embeding_dim)(i)
+   x = Embedding(output_dim=embeding_dim)(i)
 
    x = Flatten()(x) # embeding_dim * input_shape
    
