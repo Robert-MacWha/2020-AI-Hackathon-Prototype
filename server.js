@@ -9,7 +9,7 @@ const port = process.env.PORT || 6001;
 // Tensorflow library
 const tf = require('@tensorflow/tfjs');
 const { response } = require('express');
-const { model } = require('@tensorflow/tfjs');
+const { model, train } = require('@tensorflow/tfjs');
 
 app.use(cors());
 app.use(bodyParser.json({limit: '50mb'}));
@@ -68,6 +68,8 @@ app.post('/api/world', (req, res) => {
 
   }
 
+  if (model_loss > required_loss) { // Model is not yet done training
+
   // Select two random resumes and ask the human about them
   let r1 = Math.random(resumes.length);
   let r2 = Math.random(resumes.length);
@@ -75,12 +77,42 @@ app.post('/api/world', (req, res) => {
   // Set the current question var to these two ids
   current_question = [r1, r2];
 
+  // Send it to the front end
   res.send(
     {
-      "goal": "find_preferred", // also will be model_completed
+      "task": "find_preferred", // also will be model_completed
       "ids": [r1, r2]
     }
   );
+
+  } 
+  else { // Model is done training
+
+    // Get a list containing indices of all resumes
+    sorted_resumes = [...Array(resumes.length).keys()];
+    
+    // Sort the resumes
+    sorted_resumes.sort((x, y) => {
+
+      model_prediction = model.predict(resumes[x], resumes[y]);
+
+      if (model_prediction[0] > model_prediction[1]) {
+        return 1;
+      }
+      return -1;
+
+    });
+
+
+    // Send it to the front end
+    res.send(
+      {
+        "task": "model_completed",
+        "resumes": sorted_resumes
+      }
+    );
+
+  }
   
 });
 
@@ -93,6 +125,14 @@ const max_batch_size = 32;  // Max batch size used by model
 
 const required_loss = 0.1;  // How good the model has to be before it's considered
 let model_loss = 10;        // Must he larger than the required_loss
+
+const model = createModel();
+
+while (model_loss > required_loss) {
+
+  trainModel();
+  
+}
 
 function createEncoder() {
   const input = tf.input({shape: [input_dim]});
