@@ -52,7 +52,63 @@ app.post('/api/world', (req, res) => {
 
     // Extract the actual resumes from each of the list items
     resumes = [];
-    for (let i in raw_resumes) { resumes.push(i./* Insert name of item here --------------------------------------------------------------------------------------------------------------------------------------- */) }
+    for (let i in raw_resumes) { resumes.push(i.data) }
+
+    // Preprocess the data
+      // Create a tokenizer for all the words
+    let textTokenizer = [];
+    for (let r in resumes) {
+
+      let words = r.replace(/\s{2,}/g," ");
+      words = words.split(" ");
+
+      for (let word in words) {
+
+        textTokenizer.push(word);
+
+      }
+
+    }
+      // Convert the resumes (strings) into arrays of ints
+
+    let processedResumes = [];
+    let maxLength = 0;
+
+    for (let r in resumes) {
+
+      let convertedResume = [];
+
+      let words = r.replace(/\s{2,}/g," ");
+      words = words.split(" ");
+      
+      for (let word in words) {
+
+        convertedResume.push(textTokenizer.indexOf(word));
+
+      }
+
+      if (convertedResume.length > maxLength) {
+        maxLength = convertedResume.length;
+      }
+
+      processedResumes.push(convertedResume);
+
+    }
+
+      // Make sure all of these are the same length
+    for (let r in processedResumes) {
+
+      while (r.length < maxLength + 1) {
+
+        r.push(-1);
+
+      }
+
+    }
+
+      // All the resumes should now be preprocessed
+    resumes = processedResumes;
+    has_resumes = true;
 
   } 
   else 
@@ -62,9 +118,9 @@ app.post('/api/world', (req, res) => {
     response = data.preferred;
 
     // Add to the new_xs and new_ys vars
-    new_xs_A.append(resumes[current_question[0]]);
-    new_cs_B.append(resumes[current_question[1]]);
-    new_ys.append([1 - response, response]);
+    new_xs_A.push(resumes[current_question[0]]);
+    new_cs_B.push(resumes[current_question[1]]);
+    new_ys.push([1 - response, response]);
 
   }
 
@@ -94,7 +150,7 @@ app.post('/api/world', (req, res) => {
     // Sort the resumes
     sorted_resumes.sort((x, y) => {
 
-      model_prediction = model.predict(resumes[x], resumes[y]);
+      model_prediction = compiled_model.predict(resumes[x], resumes[y]);
 
       if (model_prediction[0] > model_prediction[1]) {
         return 1;
@@ -126,23 +182,23 @@ const max_batch_size = 32;  // Max batch size used by model
 const required_loss = 0.1;  // How good the model has to be before it's considered
 let model_loss = 10;        // Must he larger than the required_loss
 
-const model = createModel();
+const compiled_model = createModel();
 
 while (model_loss > required_loss) {
 
   trainModel();
-  
+
 }
 
 function createEncoder() {
   const input = tf.input({shape: [input_dim]});
 
-  const embedding = tf.layers.embedding({outputDim : embedding_dim})
+  const embedding = tf.layers.embedding({inputDim: input_dim, outputDim: embedding_dim})
 
   const flatten = tf.layers.flatten();
 
-  const dense1 = tf.layers.dense({units: 2048, activation="relu"});
-  const dense2 = tf.layers.dense({units: 1024, activation="relu"});
+  const dense1 = tf.layers.dense({units: 2048, activation: "relu"});
+  const dense2 = tf.layers.dense({units: 1024, activation: "relu"});
 
   const output = dense2.apply( dense1.apply( flatten.apply( embedding.apply( input ) ) ) );
 
@@ -161,23 +217,25 @@ function createModel() {
 
   const combiner = tf.layers.concatenate();
 
-  const dense1 = tf.layers.dense({units: 1024, activation="relu"});
-  const dense2 = tf.layers.dense({units: 256 , activation="relu"});
-  const dense3 = tf.layers.dense({units: 64  , activation="relu"});
-  const dense4 = tf.layers.dense({units: 2   , activation="sigmoid"});
+  const dense1 = tf.layers.dense({units: 1024, activation: "relu"});
+  const dense2 = tf.layers.dense({units: 256 , activation: "relu"});
+  const dense3 = tf.layers.dense({units: 64  , activation: "relu"});
+  const dense4 = tf.layers.dense({units: 2   , activation: "sigmoid"});
 
   const output = dense4.apply( dense3.apply( dense2.apply( dense1.apply(
     combiner.apply([o1, o2])
   ) ) ) );
 
-  const model = tf.model({inputs: [i1, i2], outputs: output});
+  const precompiled_model = tf.model({inputs: [i1, i2], outputs: output});
 
-  model.compile({optimizer: "adam", loss: "categoricalCrossentropy"})
+  precompiled_model.compile({optimizer: "adam", loss: "categoricalCrossentropy"})
 
-  return model;
+  return precompiled_model;
 }
 
 function trainModel () {
+
+  if (!has_resumes) { return; }
 
   // Look for new data points
   if (new_xs_A.length != 0) {
@@ -199,7 +257,7 @@ function trainModel () {
     const batch_size = Math.min(max_batch_size, Xs_A.length);
 
     // Train the model
-    const history = await model.fit([Xs_A, Xs_B], ys, {
+    const history = compiled_model.fit([Xs_A, Xs_B], ys, {
       epochs: 1, batchSize: batch_size
     });
 
