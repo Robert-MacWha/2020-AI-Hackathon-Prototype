@@ -62,7 +62,7 @@ app.post('/api/world', (req, res) => {
         i ++;
       }
 
-      resumes.push(i.data) ;
+      resumes.push(concat_resume) ;
     }
 
     // Preprocess the data
