@@ -2,18 +2,17 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require("cors");
 const fs = require('fs');
-
 const app = express();
 const port = process.env.PORT || 6001;
+
+app.use(cors());
+app.use(bodyParser.json({limit: '50mb'}));
+app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
 // Tensorflow library
 const tf = require('@tensorflow/tfjs');
 const { response } = require('express');
 const { model, train } = require('@tensorflow/tfjs');
-
-app.use(cors());
-app.use(bodyParser.json({limit: '50mb'}));
-app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
 let has_resumes = false;
 let resumes = [];
@@ -35,7 +34,7 @@ let new_ys   = [];
 // The pair of resumes currently being examined by the human
 let current_question = [];
 
-app.post('/api/world', (req, res) => {
+app.post('/api/world', cors(), (req, res) => {
   console.log("req.body", req.body);
 
   let data = JSON.stringify(req.body);
@@ -145,10 +144,10 @@ app.post('/api/world', (req, res) => {
   current_question = [r1, r2];
 
   // Send it to the front end
-  res.send(
+  res.json(
     {
-      "task": "find_preferred", // also will be model_completed
-      "ids": [r1, r2]
+      task: "find_preferred", // also will be model_completed
+      ids: [r1, r2]
     }
   );
 
@@ -172,15 +171,14 @@ app.post('/api/world', (req, res) => {
 
 
     // Send it to the front end
-    res.send(
+    res.json(
       {
-        "task": "model_completed",
-        "resumes": sorted_resumes
+        task: "model_completed",
+        resumes: sorted_resumes
       }
     );
-
   }
-  
+    
 });
 
 // Tensorflow model
@@ -277,5 +275,3 @@ function trainModel () {
 
 }
 
-// Debug statement, app is running
-app.listen(port, () => console.log(`Listening on port ${port}`));
