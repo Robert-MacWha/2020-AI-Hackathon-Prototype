@@ -52,7 +52,18 @@ app.post('/api/world', (req, res) => {
 
     // Extract the actual resumes from each of the list items
     resumes = [];
-    for (let i in raw_resumes) { resumes.push(i.data) }
+    for (let i in raw_resumes.data) { 
+      let listed_resume = i.data;
+      let concat_resume = "";
+
+      i = 3;
+      while (i < listed_resume.length) {
+        concat_resume += listed_resume[i];
+        i ++;
+      }
+
+      resumes.push(i.data) ;
+    }
 
     // Preprocess the data
       // Create a tokenizer for all the words
