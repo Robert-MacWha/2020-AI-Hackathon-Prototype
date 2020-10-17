@@ -6,9 +6,9 @@ let app = express();
 let port = process.env.PORT || 6001;
 
 // Tensorflow library
-let tf = require('@tensorflow/tfjs');
-let { response } = require('express');
-let { model, train } = require('@tensorflow/tfjs');
+// let tf = require('@tensorflow/tfjs');
+// let { response } = require('express');
+// let { model, train } = require('@tensorflow/tfjs');
 
 app.use(cors());
 app.use(bodyParser.json({limit: '50mb'}));
@@ -16,6 +16,7 @@ app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 
 // New resumes to be added to the training dataset
 let new_xs_A = [];
+let Xs_A = [];
 let new_cs_B = [];
 let resumes = [];
 let has_resumes = false;
@@ -109,7 +110,7 @@ app.post('/api/world', cors(), (req, res) => {
         // All the resumes should now be preprocessed
       resumes = processedResumes;
       has_resumes = true;
-      train2()
+    //   train2()
     } 
     else 
     {
@@ -177,97 +178,93 @@ app.post('/api/world', cors(), (req, res) => {
 app.listen(6001, () => console.log(`Listening on port 6001`));
 
   // Tensorflow model
-function train2 () {
-    let input_dim     = 100;  // amount of words in the preprocessed resumes
-    let embedding_dim = 64;   // dimensionality of the embedding
+// function train2 () {
+//     let input_dim     = 100;  // amount of words in the preprocessed resumes
+//     let embedding_dim = 64;   // dimensionality of the embedding
     
-    let min_batch_size = 8;   // Minimum amount of data points required to train the model
-    let max_batch_size = 32;  // Max batch size used by model
+//     let min_batch_size = 8;   // Minimum amount of data points required to train the model
+//     let max_batch_size = 32;  // Max batch size used by model
     
-    let compiled_model = createModel();
+//     let compiled_model = createModel();
     
-    while (model_loss > required_loss) {
+//     while (model_loss > required_loss) {
     
-      trainModel();
+//       trainModel();
     
-    }
+//     }
     
-    function createEncoder() {
-      let input = tf.input({shape: [input_dim]});
+//     function createEncoder() {
+//       let input = tf.input({shape: [input_dim]});
     
-      let embedding = tf.layers.embedding({inputDim: input_dim, outputDim: embedding_dim})
+//       let embedding = tf.layers.embedding({inputDim: input_dim, outputDim: embedding_dim})
     
-      let flatten = tf.layers.flatten();
+//       let flatten = tf.layers.flatten();
     
-      let dense1 = tf.layers.dense({units: 2048, activation: "relu"});
-      let dense2 = tf.layers.dense({units: 1024, activation: "relu"});
+//       let dense1 = tf.layers.dense({units: 2048, activation: "relu"});
+//       let dense2 = tf.layers.dense({units: 1024, activation: "relu"});
     
-      let output = dense2.apply( dense1.apply( flatten.apply( embedding.apply( input ) ) ) );
+//       let output = dense2.apply( dense1.apply( flatten.apply( embedding.apply( input ) ) ) );
     
-      return [input, output]
-    }
+//       return [input, output]
+//     }
     
-    function createModel() {
-      let encoder1 = createEncoder();
-      let encoder2 = createEncoder();
+//     function createModel() {
+//       let encoder1 = createEncoder();
+//       let encoder2 = createEncoder();
     
-      let i1 = encoder1[0];
-      let o1 = encoder1[1];
+//       let i1 = encoder1[0];
+//       let o1 = encoder1[1];
     
-      let i2 = encoder2[0];
-      let o2 = encoder2[1];
+//       let i2 = encoder2[0];
+//       let o2 = encoder2[1];
     
-      let combiner = tf.layers.concatenate();
+//       let combiner = tf.layers.concatenate();
     
-      let dense1 = tf.layers.dense({units: 1024, activation: "relu"});
-      let dense2 = tf.layers.dense({units: 256 , activation: "relu"});
-      let dense3 = tf.layers.dense({units: 64  , activation: "relu"});
-      let dense4 = tf.layers.dense({units: 2   , activation: "sigmoid"});
+//       let dense1 = tf.layers.dense({units: 1024, activation: "relu"});
+//       let dense2 = tf.layers.dense({units: 256 , activation: "relu"});
+//       let dense3 = tf.layers.dense({units: 64  , activation: "relu"});
+//       let dense4 = tf.layers.dense({units: 2   , activation: "sigmoid"});
     
-      let output = dense4.apply( dense3.apply( dense2.apply( dense1.apply(
-        combiner.apply([o1, o2])
-      ) ) ) );
+//       let output = dense4.apply( dense3.apply( dense2.apply( dense1.apply(
+//         combiner.apply([o1, o2])
+//       ) ) ) );
     
-      let precompiled_model = tf.model({inputs: [i1, i2], outputs: output});
+//       let precompiled_model = tf.model({inputs: [i1, i2], outputs: output});
     
-      precompiled_model.compile({optimizer: "adam", loss: "categoricalCrossentropy"})
+//       precompiled_model.compile({optimizer: "adam", loss: "categoricalCrossentropy"})
     
-      return precompiled_model;
-    }
+//       return precompiled_model;
+//     }
     
-    function trainModel () {
+//     function trainModel () {
     
-      if (!has_resumes) { return; }
+//       if (!has_resumes) { return; }
     
-      // Look for new data points
-      if (new_xs_A.length != 0) {
+//       // Look for new data points
+//       if (new_xs_A.length != 0) {
     
-        Xs_A = Xs_A.concat(new_xs_A);
-        Xs_B = Xs_B.concat(new_xs_B);
-        ys   = ys.concat(new_ys);
+//         Xs_A = Xs_A.concat(new_xs_A);
+//         Xs_B = Xs_B.concat(new_xs_B);
+//         ys   = ys.concat(new_ys);
     
-        new_xs_A = [];
-        new_xs_B = [];
-        new_ys   = [];
+//       }
     
-      }
+//       // See if there are enough data points to train the model
+//       if (Xs_A.length >= min_batch_size) {
     
-      // See if there are enough data points to train the model
-      if (Xs_A.length >= min_batch_size) {
+//         // Set the batch size to the correct value
+//         let batch_size = Math.min(max_batch_size, Xs_A.length);
     
-        // Set the batch size to the correct value
-        let batch_size = Math.min(max_batch_size, Xs_A.length);
+//         // Train the model
+//         let history = compiled_model.fit([Xs_A, Xs_B], ys, {
+//           epochs: 1, batchSize: batch_size
+//         });
     
-        // Train the model
-        let history = compiled_model.fit([Xs_A, Xs_B], ys, {
-          epochs: 1, batchSize: batch_size
-        });
+//         model_loss = history.history.loss;
+//       }
     
-        model_loss = history.history.loss;
-      }
-    
-    }
-}
+//     }
+// }
 
 
   
