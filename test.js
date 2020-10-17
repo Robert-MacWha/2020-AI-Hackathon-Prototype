@@ -5,6 +5,11 @@ const fs = require('fs');
 const app = express();
 const port = process.env.PORT || 6001;
 
+// Tensorflow library
+// const tf = require('@tensorflow/tfjs');
+// const { response } = require('express');
+// const { model, train } = require('@tensorflow/tfjs');
+
 app.use(cors());
 app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
@@ -13,6 +18,7 @@ app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
 let new_xs_A = [];
 let new_cs_B = [];
 let resumes = [];
+let has_resumes = false;
 // The pair of resumes currently being examined by the human
 let current_question = [];
 let new_ys = [];
@@ -35,7 +41,6 @@ app.post('/api/world', cors(), (req, res) => {
       raw_resumes.splice(0, 1);
   
       // Extract the actual resumes from each of the list items
-      resumes = [];
       for (let i in raw_resumes.data) { 
         let listed_resume = i.data;
         let concat_resume = "";
@@ -122,8 +127,10 @@ app.post('/api/world', cors(), (req, res) => {
     if (model_loss > required_loss) { // Model is not yet done training
   
     // Select two random resumes and ask the human about them
-    let r1 = Math.random(resumes.length);
-    let r2 = Math.random(resumes.length);
+    // let r1 = Math.random() * (resumes.length);
+    // let r2 = Math.random() * (resumes.length);
+    let r1 = Math.floor(Math.random() * 1000);
+    let r2 = Math.floor(Math.random() * 1000);
   
     // Set the current question var to these two ids
     current_question = [r1, r2];
@@ -165,6 +172,97 @@ app.post('/api/world', cors(), (req, res) => {
     }
     
   });
+
+  // Tensorflow model
+// const input_dim     = 100;  // amount of words in the preprocessed resumes
+// const embedding_dim = 64;   // dimensionality of the embedding
+
+// const min_batch_size = 8;   // Minimum amount of data points required to train the model
+// const max_batch_size = 32;  // Max batch size used by model
+
+// const compiled_model = createModel();
+
+// while (model_loss > required_loss) {
+
+//   trainModel();
+
+// }
+
+// function createEncoder() {
+//   const input = tf.input({shape: [input_dim]});
+
+//   const embedding = tf.layers.embedding({inputDim: input_dim, outputDim: embedding_dim})
+
+//   const flatten = tf.layers.flatten();
+
+//   const dense1 = tf.layers.dense({units: 2048, activation: "relu"});
+//   const dense2 = tf.layers.dense({units: 1024, activation: "relu"});
+
+//   const output = dense2.apply( dense1.apply( flatten.apply( embedding.apply( input ) ) ) );
+
+//   return [input, output]
+// }
+
+// function createModel() {
+//   let encoder1 = createEncoder();
+//   let encoder2 = createEncoder();
+
+//   let i1 = encoder1[0];
+//   let o1 = encoder1[1];
+
+//   let i2 = encoder2[0];
+//   let o2 = encoder2[1];
+
+//   const combiner = tf.layers.concatenate();
+
+//   const dense1 = tf.layers.dense({units: 1024, activation: "relu"});
+//   const dense2 = tf.layers.dense({units: 256 , activation: "relu"});
+//   const dense3 = tf.layers.dense({units: 64  , activation: "relu"});
+//   const dense4 = tf.layers.dense({units: 2   , activation: "sigmoid"});
+
+//   const output = dense4.apply( dense3.apply( dense2.apply( dense1.apply(
+//     combiner.apply([o1, o2])
+//   ) ) ) );
+
+//   const precompiled_model = tf.model({inputs: [i1, i2], outputs: output});
+
+//   precompiled_model.compile({optimizer: "adam", loss: "categoricalCrossentropy"})
+
+//   return precompiled_model;
+// }
+
+// function trainModel () {
+
+//   if (!has_resumes) { return; }
+
+//   // Look for new data points
+//   if (new_xs_A.length != 0) {
+
+//     Xs_A = Xs_A.concat(new_xs_A);
+//     Xs_B = Xs_B.concat(new_xs_B);
+//     ys   = ys.concat(new_ys);
+
+//     new_xs_A = [];
+//     new_xs_B = [];
+//     new_ys   = [];
+
+//   }
+
+//   // See if there are enough data points to train the model
+//   if (Xs_A.length >= min_batch_size) {
+
+//     // Set the batch size to the correct value
+//     const batch_size = Math.min(max_batch_size, Xs_A.length);
+
+//     // Train the model
+//     const history = compiled_model.fit([Xs_A, Xs_B], ys, {
+//       epochs: 1, batchSize: batch_size
+//     });
+
+//     model_loss = history.history.loss;
+//   }
+
+// }
 
   // Debug statement, app is running
   app.listen(6001, () => console.log(`Listening on port 6001`));
